@@ -269,10 +269,10 @@ function renderPelanggan() {
             <td>${p.jumlahDevice||1} device</td><td>${p.tglDaftar||'-'}</td>
             <td>${tunggakan>0?`<span class="tunggakan-badge">${formatRupiah(tunggakan)}</span>`:'<span class="badge badge-success">Lunas</span>'}</td>
             <td><div class="action-btns">
-                <button class="btn-info btn-sm" onclick="detailPelanggan('${p.id}')" title="Detail"></button>
+                <button class="btn-info btn-sm" onclick="detailPelanggan('${p.id}')" title="Detail">📋</button>
                 <button class="btn-warning btn-sm" onclick="editPelanggan('${p.id}')" title="Edit">✏️</button>
                 <button class="btn-success btn-sm" onclick="printKupon('${p.id}')" title="Print Kupon">🖨️</button>
-                <button class="btn-danger btn-sm" onclick="hapusPelanggan('${p.id}')" title="Hapus">️</button>
+                <button class="btn-danger btn-sm" onclick="hapusPelanggan('${p.id}')" title="Hapus">🗑️</button>
             </div></td>
         </tr>`;
     }).join('');
@@ -374,7 +374,7 @@ function hapusPelanggan(id) {
         db.collection('pelanggan').doc(id).delete().then(()=>{
             showToast('Pelanggan dihapus!','success'); loadDataFromFirestore();
         }).catch(err=>{
-            if(err.code === 'permission-denied') { showToast(' Akses ditolak. Login ulang.','error'); auth.signOut(); }
+            if(err.code === 'permission-denied') { showToast('⛔ Akses ditolak. Login ulang.','error'); auth.signOut(); }
         });
     } else {
         pelangganData = pelangganData.filter(x=>x.id!==id);
@@ -410,7 +410,7 @@ function detailPelanggan(id) {
         const status = bayar && bayar.status==='lunas';
         html += `<tr>
             <td>${BULAN_NAMES[m]} ${cy}</td>
-            <td>${status?'<span class="badge badge-success">✅ Lunas</span>':'<span class="badge badge-danger"> Belum</span>'}</td>
+            <td>${status?'<span class="badge badge-success">✅ Lunas</span>':'<span class="badge badge-danger">❌ Belum</span>'}</td>
             <td>${status?(bayar.tglBayar||'-'):'-'}</td>
             <td>${!status?`<button class="btn-success btn-sm" onclick="bayarDariDetail('${p.id}','${bk}',${m},${cy})">💰 Bayar</button>`:`<button class="btn-danger btn-sm" onclick="batalBayar('${p.id}','${bk}')">↩️</button> <button class="btn-info btn-sm" onclick="printBayarKupon('${p.id}','${bk}')">🖨️</button>`}</td>
         </tr>`;
@@ -573,7 +573,7 @@ function hapusPengeluaran(id) {
     const p = pengeluaranData.find(x=>x.id===id);
     if(isOnline) {
         db.collection('pengeluaran').doc(id).delete().then(()=>{ showToast('Dihapus!','success'); loadDataFromFirestore(); })
-        .catch(err=>{ if(err.code === 'permission-denied') { showToast(' Akses ditolak. Login ulang.','error'); auth.signOut(); } });
+        .catch(err=>{ if(err.code === 'permission-denied') { showToast('⛔ Akses ditolak. Login ulang.','error'); auth.signOut(); } });
     } else {
         pengeluaranData = pengeluaranData.filter(x=>x.id!==id);
         saveToOfflineStorage('pengeluaran',pengeluaranData);
@@ -641,7 +641,7 @@ function addTransaksi(tipe, keterangan, jumlah, namaPelanggan) {
     else addToOfflineQueue('addTransaksi',{id,...data});
 }
 
-// ==================== PRINT & KUPON (1 KOLOM + SHARE) ====================
+// ==================== PRINT & KUPON (1 KOLOM + SHARE + CS) ====================
 function printPage() { window.print(); }
 
 function printKupon(pid) {
@@ -663,11 +663,11 @@ function printBayarKupon(pid, bk) {
     const tglCetak = new Date().toLocaleDateString('id-ID');
     const nomorHP = formatPhoneNumber(p.nomorHP);
 
-    const shareText = `*KUPON TAGIHAN WIFI*\n\nHalo ${p.nama},\nBerikut tagihan WiFi Anda:\n• No KTL: ${p.nomorKTL}\n• Paket: ${tarif}\n• Bulan: ${bulanNama}\n• Status: ${status?'✅ LUNAS':'❌ BELUM BAYAR'}\n\nMohon segera melakukan pembayaran.\nTerima kasih!`;
+    const shareText = `*KUPON WIFI SAMBALEAN*\n\nHalo ${p.nama},\nBerikut tagihan WiFi Anda:\n• No KTL: ${p.nomorKTL}\n• Paket: ${tarif}\n• Bulan: ${bulanNama}\n• Status: ${status?'✅ LUNAS':'❌ BELUM BAYAR'}\n\nMohon segera melakukan pembayaran.\nTerima kasih!`;
     const waLink = `https://wa.me/${nomorHP}?text=${encodeURIComponent(shareText.replace(/[*_~]/g, ''))}`;
     const emailLink = `mailto:?subject=Tagihan WiFi ${bulanNama} - ${p.nomorKTL}&body=${encodeURIComponent(shareText.replace(/\*/g, ''))}`;
 
-    const html = `<html><head><title>Kupon Tagihan - ${p.nama} - ${bulanNama}</title>
+    const html = `<html><head><title>Kupon - ${p.nama} - ${bulanNama}</title>
     <style>
         *{margin:0;padding:0;box-sizing:border-box;}
         body{font-family:'Courier New',monospace;font-size:11px;padding:10px;background:#f5f5f5;}
@@ -679,6 +679,8 @@ function printBayarKupon(pid, bk) {
         .kupon-value{flex:1;border-bottom:1px dotted #aaa;padding-bottom:1px;min-height:14px;font-size:12px;}
         .kupon-divider{border-top:3px solid #333;margin:15px 0;}
         .kupon-total{font-size:18px;font-weight:bold;text-align:center;margin:10px 0;}
+        .kupon-cs{text-align:center;font-size:12px;margin-top:15px;padding-top:10px;border-top:1px dashed #999;color:#555;line-height:1.6;}
+        .kupon-cs strong{font-size:13px;color:#333;}
         .status-lunas{color:green;font-weight:bold;font-size:14px;}
         .status-belum{color:red;font-weight:bold;font-size:14px;}
         .btn-group{margin-top:20px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;}
@@ -696,7 +698,7 @@ function printBayarKupon(pid, bk) {
         }
     </style></head><body>
     <div class="kupon-container">
-        <div class="kupon-title">📡 KUPON TAGIHAN WIFI<small>PELANGGAN</small></div>
+        <div class="kupon-title">📡 KUPON WIFI SAMBALEAN<small>PELANGGAN</small></div>
         <div class="kupon-row"><span class="kupon-label">NOMOR HP</span><span class="kupon-value">${p.nomorHP||'-'}</span></div>
         <div class="kupon-row"><span class="kupon-label">NOMOR KTL</span><span class="kupon-value">${p.nomorKTL||'-'}</span></div>
         <div class="kupon-row"><span class="kupon-label">NAMA</span><span class="kupon-value">${p.nama||'-'}</span></div>
@@ -707,6 +709,9 @@ function printBayarKupon(pid, bk) {
         <div class="kupon-row"><span class="kupon-label">TGL BAYAR</span><span class="kupon-value">${bayar?bayar.tglBayar:'-'}</span></div>
         <div class="kupon-divider"></div>
         <div class="kupon-total">JUMLAH: ${tarif}</div>
+        <div class="kupon-cs">
+            <strong>📞 CS. 085240529114, 082193099155</strong>
+        </div>
     </div>
     <div class="btn-group">
         <button class="btn-share btn-print" onclick="window.print()">🖨️ Print</button>
@@ -779,7 +784,7 @@ function updateBackupPageInfo() {
         <div class="detail-item"><label>Total Pelanggan</label><p>${pelangganData.length} orang</p></div>
         <div class="detail-item"><label>Total Transaksi</label><p>${transaksiData.length} record</p></div>
         <div class="detail-item"><label>Total Pengeluaran</label><p>${pengeluaranData.length} record</p></div>
-        <div class="detail-item"><label>Status</label><p>${isOnline?'🟢 Online':'🔴 Offline'}</p></div>
+        <div class="detail-item"><label>Status</label><p>${isOnline?'🟢 Online':' Offline'}</p></div>
     `;
 }
 
@@ -794,7 +799,7 @@ function handleImportFile(input) {
     const progressBar = document.getElementById('progressBar');
     const progressText = document.getElementById('progressText');
 
-    statusEl.innerHTML='<p> Membaca file...</p>';
+    statusEl.innerHTML='<p>📖 Membaca file...</p>';
     progressEl.style.display='block'; progressBar.style.width='0%'; progressText.textContent='0%';
 
     const reader = new FileReader();
@@ -915,7 +920,7 @@ function doLogout() {
 function resetPassword() {
     const email = prompt('Masukkan email admin untuk reset password:');
     if(!email) return;
-    auth.sendPasswordResetEmail(email).then(()=>showToast(' Link reset dikirim ke email!','success')).catch(err=>showToast('❌ '+err.message,'error'));
+    auth.sendPasswordResetEmail(email).then(()=>showToast('📧 Link reset dikirim ke email!','success')).catch(err=>showToast('❌ '+err.message,'error'));
 }
 
 // ==================== UTILITIES ====================
