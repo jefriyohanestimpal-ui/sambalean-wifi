@@ -12,14 +12,6 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 const auth = firebase.auth();
 
-// ==================== WHATSAPP CONFIG ====================
-const WHATSAPP_CONFIG = {
-    enabled: false,  // Set true jika sudah punya token Fonnte
-    fonnteToken: 'GANTI_DENGAN_TOKEN_FONNTE_ANDA',
-    fonnteUrl: 'https://api.fonnte.com/send',
-    senderName: 'WiFi Manager'
-};
-
 // ==================== GLOBAL STATE ====================
 let pelangganData = [];
 let pengeluaranData = [];
@@ -31,7 +23,7 @@ let currentUser = null;
 const BULAN_NAMES = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 const PAKET_LABELS = {'40000':'40.000','60000':'60.000','70000':'70.000','150000':'150.000'};
 
-// ==================== INIT ====================
+// ==================== INIT & AUTH OBSERVER ====================
 document.addEventListener('DOMContentLoaded', function() {
     setDefaultDates();
     populateYearFilter();
@@ -53,7 +45,6 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('loginEmail').value = '';
             document.getElementById('loginPassword').value = '';
             document.getElementById('loginError').textContent = '';
-            // Bersihkan data lokal saat logout untuk keamanan
             pelangganData = []; pengeluaranData = []; transaksiData = [];
             renderAll();
         }
@@ -160,7 +151,7 @@ function loadOfflineData() {
     updateSyncStatus();
 }
 
-// ==================== FIREBASE OPERATIONS (PRODUCTION READY) ====================
+// ==================== FIREBASE OPERATIONS ====================
 function loadDataFromFirestore() {
     const handleAuthError = (err) => {
         if(err.code === 'permission-denied') {
@@ -280,8 +271,8 @@ function renderPelanggan() {
             <td><div class="action-btns">
                 <button class="btn-info btn-sm" onclick="detailPelanggan('${p.id}')" title="Detail"></button>
                 <button class="btn-warning btn-sm" onclick="editPelanggan('${p.id}')" title="Edit">✏️</button>
-                <button class="btn-success btn-sm" onclick="printKupon('${p.id}')" title="Print">🖨️</button>
-                <button class="btn-danger btn-sm" onclick="hapusPelanggan('${p.id}')" title="Hapus">🗑️</button>
+                <button class="btn-success btn-sm" onclick="printKupon('${p.id}')" title="Print Kupon">🖨️</button>
+                <button class="btn-danger btn-sm" onclick="hapusPelanggan('${p.id}')" title="Hapus">️</button>
             </div></td>
         </tr>`;
     }).join('');
@@ -308,10 +299,8 @@ function simpanPelanggan() {
     const id = 'p_'+Date.now();
     data.id = id;
 
-    const saveToFirestore = () => db.collection('pelanggan').doc(id).set(data);
-
     if(isOnline) {
-        saveToFirestore().then(()=>{
+        db.collection('pelanggan').doc(id).set(data).then(()=>{
             showToast('Pelanggan berhasil ditambahkan!','success');
             hideModal('modalTambahPelanggan'); clearForm('modalTambahPelanggan');
             addTransaksi('info',`Pelanggan baru: ${data.nama}`,0,data.nama);
@@ -385,7 +374,7 @@ function hapusPelanggan(id) {
         db.collection('pelanggan').doc(id).delete().then(()=>{
             showToast('Pelanggan dihapus!','success'); loadDataFromFirestore();
         }).catch(err=>{
-            if(err.code === 'permission-denied') { showToast('⛔ Akses ditolak. Login ulang.','error'); auth.signOut(); }
+            if(err.code === 'permission-denied') { showToast(' Akses ditolak. Login ulang.','error'); auth.signOut(); }
         });
     } else {
         pelangganData = pelangganData.filter(x=>x.id!==id);
@@ -421,9 +410,9 @@ function detailPelanggan(id) {
         const status = bayar && bayar.status==='lunas';
         html += `<tr>
             <td>${BULAN_NAMES[m]} ${cy}</td>
-            <td>${status?'<span class="badge badge-success">✅ Lunas</span>':'<span class="badge badge-danger">❌ Belum</span>'}</td>
+            <td>${status?'<span class="badge badge-success">✅ Lunas</span>':'<span class="badge badge-danger"> Belum</span>'}</td>
             <td>${status?(bayar.tglBayar||'-'):'-'}</td>
-            <td>${!status?`<button class="btn-success btn-sm" onclick="bayarDariDetail('${p.id}','${bk}',${m},${cy})">💰 Bayar</button>`:`<button class="btn-danger btn-sm" onclick="batalBayar('${p.id}','${bk}')">↩️</button> <button class="btn-info btn-sm" onclick="printBayarKupon('${p.id}','${bk}')">️</button>`}</td>
+            <td>${!status?`<button class="btn-success btn-sm" onclick="bayarDariDetail('${p.id}','${bk}',${m},${cy})">💰 Bayar</button>`:`<button class="btn-danger btn-sm" onclick="batalBayar('${p.id}','${bk}')">↩️</button> <button class="btn-info btn-sm" onclick="printBayarKupon('${p.id}','${bk}')">🖨️</button>`}</td>
         </tr>`;
     }
     tbody.innerHTML = html;
@@ -584,7 +573,7 @@ function hapusPengeluaran(id) {
     const p = pengeluaranData.find(x=>x.id===id);
     if(isOnline) {
         db.collection('pengeluaran').doc(id).delete().then(()=>{ showToast('Dihapus!','success'); loadDataFromFirestore(); })
-        .catch(err=>{ if(err.code === 'permission-denied') { showToast('⛔ Akses ditolak. Login ulang.','error'); auth.signOut(); } });
+        .catch(err=>{ if(err.code === 'permission-denied') { showToast(' Akses ditolak. Login ulang.','error'); auth.signOut(); } });
     } else {
         pengeluaranData = pengeluaranData.filter(x=>x.id!==id);
         saveToOfflineStorage('pengeluaran',pengeluaranData);
@@ -652,85 +641,7 @@ function addTransaksi(tipe, keterangan, jumlah, namaPelanggan) {
     else addToOfflineQueue('addTransaksi',{id,...data});
 }
 
-// ==================== WHATSAPP ====================
-function formatPhoneNumber(phone) {
-    let c = (phone||'').replace(/[\s\-\(\)]/g,'');
-    if(c.startsWith('0')) c = '62'+c.substring(1);
-    if(c.startsWith('+62')) c = '62'+c.substring(3);
-    return c;
-}
-
-async function sendWhatsAppNotification(phone, message) {
-    if(!WHATSAPP_CONFIG.enabled) { console.log('WA disabled'); return {success:false,message:'WhatsApp disabled'}; }
-    const fp = formatPhoneNumber(phone);
-    try {
-        const res = await fetch(WHATSAPP_CONFIG.fonnteUrl, {
-            method:'POST',
-            headers:{'Authorization':WHATSAPP_CONFIG.fonnteToken,'Content-Type':'application/json'},
-            body:JSON.stringify({target:fp,message:message,countryCode:'62'})
-        });
-        const result = await res.json();
-        if(result.status) { showToast('✅ WA terkirim ke '+phone,'success'); return {success:true,result}; }
-        else { showToast('❌ Gagal: '+result.reason,'error'); return {success:false,error:result.reason}; }
-    } catch(e) { showToast('Error kirim WA','error'); return {success:false,error:e.message}; }
-}
-
-function generateReminderMessage(p, bulan, tahun, daysUntilDue) {
-    let urgency = daysUntilDue<=0?'🔴 *SUDAH JATUH TEMPO*':daysUntilDue<=3?'🟡 *SEGERA BAYAR*':'🟢 *PENGINGAT*';
-    return `*${urgency}*
-
-Halo *${p.nama}*,
-
-Ini pengingat tagihan WiFi bulan *${bulan} ${tahun}*
-
-📋 Detail Tagihan:
-- Nomor KTL: ${p.nomorKTL}
-- Paket: ${formatRupiah(p.paket)}
-- Jatuh Tempo: ${p.tglJatuhTempo||'-'}
-
-💰 Silakan segera melakukan pembayaran.
-
-Terima kasih 
-_*WiFi Manager*_`.trim();
-}
-
-async function sendBulkReminders(daysBefore = 3) {
-    if(!confirm(`Kirim pengingat H-${daysBefore} ke semua pelanggan yang belum bayar?`)) return;
-    const now = new Date();
-    const cm = now.getMonth(), cy = now.getFullYear();
-    let sent = 0, failed = 0;
-    showToast('📤 Mengirim pengingat...','warning');
-
-    for(const p of pelangganData) {
-        const bk = cy+'-'+String(cm+1).padStart(2,'0');
-        const sb = p.pembayaran && p.pembayaran[bk] && p.pembayaran[bk].status==='lunas';
-        if(!sb) {
-            let days = 999;
-            if(p.tglJatuhTempo) {
-                const jt = new Date(p.tglJatuhTempo);
-                days = Math.ceil((jt-now)/(1000*60*60*24));
-            }
-            if(days <= daysBefore && p.nomorHP) {
-                const msg = generateReminderMessage(p, BULAN_NAMES[cm], cy, days);
-                const res = await sendWhatsAppNotification(p.nomorHP, msg);
-                if(res.success) sent++; else failed++;
-                await new Promise(r=>setTimeout(r,1200));
-            }
-        }
-    }
-    showToast(`✅ Terkirim: ${sent}, Gagal: ${failed}`,'success');
-}
-
-function sendManualWA() {
-    const phone = document.getElementById('manualWAPhone').value;
-    const msg = document.getElementById('manualWAMessage').value;
-    if(!phone||!msg) { showToast('Nomor dan pesan wajib diisi!','error'); return; }
-    sendWhatsAppNotification(phone, msg);
-    document.getElementById('manualWAPhone').value = '';
-    document.getElementById('manualWAMessage').value = '';
-}
-
-// ==================== PRINT ====================
+// ==================== PRINT & KUPON (1 KOLOM + SHARE) ====================
 function printPage() { window.print(); }
 
 function printKupon(pid) {
@@ -749,65 +660,73 @@ function printBayarKupon(pid, bk) {
     const bayar = p.pembayaran && p.pembayaran[bk];
     const status = bayar && bayar.status==='lunas';
     const tarif = formatRupiah(p.paket);
+    const tglCetak = new Date().toLocaleDateString('id-ID');
+    const nomorHP = formatPhoneNumber(p.nomorHP);
 
-    const html = `<html><head><title>Kupon - ${p.nama} - ${bulanNama}</title>
+    const shareText = `*KUPON TAGIHAN WIFI*\n\nHalo ${p.nama},\nBerikut tagihan WiFi Anda:\n• No KTL: ${p.nomorKTL}\n• Paket: ${tarif}\n• Bulan: ${bulanNama}\n• Status: ${status?'✅ LUNAS':'❌ BELUM BAYAR'}\n\nMohon segera melakukan pembayaran.\nTerima kasih!`;
+    const waLink = `https://wa.me/${nomorHP}?text=${encodeURIComponent(shareText.replace(/[*_~]/g, ''))}`;
+    const emailLink = `mailto:?subject=Tagihan WiFi ${bulanNama} - ${p.nomorKTL}&body=${encodeURIComponent(shareText.replace(/\*/g, ''))}`;
+
+    const html = `<html><head><title>Kupon Tagihan - ${p.nama} - ${bulanNama}</title>
     <style>
         *{margin:0;padding:0;box-sizing:border-box;}
-        body{font-family:'Courier New',monospace;font-size:11px;padding:10px;}
-        .kc{display:flex;width:100%;max-width:550px;margin:0 auto;}
-        .kh{width:50%;border:2px solid #333;padding:10px;}
-        .kh.arsip{border-right:3px dashed #999;}
-        .kh.pelanggan{border-left:none;}
-        .kt{text-align:center;font-weight:bold;font-size:14px;border-bottom:2px solid #333;padding-bottom:6px;margin-bottom:8px;}
-        .kt small{font-weight:normal;font-size:10px;}
-        .kr{display:flex;margin-bottom:4px;align-items:baseline;}
-        .kl{width:85px;font-weight:bold;font-size:10px;}
-        .kv{flex:1;border-bottom:1px dotted #999;padding-bottom:1px;min-height:14px;}
-        .kd{border-top:2px solid #333;margin:10px 0;}
-        .kf{text-align:center;margin-top:12px;font-size:9px;border-top:1px solid #ccc;padding-top:6px;}
-        .kf .ttd{margin-top:30px;display:flex;justify-content:space-around;}
-        .kf .ttd div{text-align:center;}
-        .kf .ttd .line{border-top:1px solid #333;width:100px;margin:30px auto 4px;}
-        .sl{color:green;font-weight:bold;}.sb{color:red;font-weight:bold;}
-        @media print{.np{display:none;}}
+        body{font-family:'Courier New',monospace;font-size:11px;padding:10px;background:#f5f5f5;}
+        .kupon-container{background:white;max-width:400px;margin:0 auto;padding:20px;border:2px solid #333;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);}
+        .kupon-title{text-align:center;font-weight:bold;font-size:16px;border-bottom:3px solid #333;padding-bottom:8px;margin-bottom:15px;text-transform:uppercase;}
+        .kupon-title small{font-weight:normal;font-size:11px;display:block;margin-top:4px;}
+        .kupon-row{display:flex;margin-bottom:6px;align-items:baseline;}
+        .kupon-label{width:80px;font-weight:bold;font-size:11px;flex-shrink:0;}
+        .kupon-value{flex:1;border-bottom:1px dotted #aaa;padding-bottom:1px;min-height:14px;font-size:12px;}
+        .kupon-divider{border-top:3px solid #333;margin:15px 0;}
+        .kupon-total{font-size:18px;font-weight:bold;text-align:center;margin:10px 0;}
+        .status-lunas{color:green;font-weight:bold;font-size:14px;}
+        .status-belum{color:red;font-weight:bold;font-size:14px;}
+        .btn-group{margin-top:20px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;}
+        .btn-share{padding:10px 20px;border-radius:6px;border:none;cursor:pointer;font-size:13px;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:opacity 0.2s;}
+        .btn-share:hover{opacity:0.8;}
+        .btn-print{background:#3B82F6;color:white;}
+        .btn-wa{background:#25D366;color:white;}
+        .btn-email{background:#EA4335;color:white;}
+        .btn-close{background:#6B7280;color:white;}
+        .cetak-info{text-align:center;font-size:10px;color:#999;margin-top:12px;}
+        @media print{
+            body{background:white;padding:0;}
+            .kupon-container{box-shadow:none;border:1px solid #000;}
+            .btn-group,.cetak-info{display:none !important;}
+        }
     </style></head><body>
-    <h2 style="text-align:center;margin-bottom:15px;font-family:sans-serif;">KUPON TAGIHAN WIFI</h2>
-    <div class="kc">
-        <div class="kh arsip">
-            <div class="kt">📡 KUPON TAGIHAN WIFI<br><small>(ARSIP - PEMILIK)</small></div>
-            <div class="kr"><span class="kl">NOMOR HP</span><span class="kv">${p.nomorHP||'-'}</span></div>
-            <div class="kr"><span class="kl">NOMOR KTL</span><span class="kv">${p.nomorKTL||'-'}</span></div>
-            <div class="kr"><span class="kl">NAMA</span><span class="kv">${p.nama||'-'}</span></div>
-            <div class="kr"><span class="kl">ALAMAT</span><span class="kv">${p.alamat||'-'}</span></div>
-            <div class="kr"><span class="kl">BULAN</span><span class="kv">${bulanNama}</span></div>
-            <div class="kr"><span class="kl">TARIFF</span><span class="kv">${tarif}</span></div>
-            <div class="kr"><span class="kl">STATUS</span><span class="kv ${status?'sl':'sb'}">${status?'✅ LUNAS':'❌ BELUM BAYAR'}</span></div>
-            <div class="kr"><span class="kl">TGL BAYAR</span><span class="kv">${bayar?bayar.tglBayar:'-'}</span></div>
-            <div class="kd"></div>
-            <div class="kr"><span class="kl">JUMLAH RP</span><span class="kv" style="font-weight:bold;font-size:13px;">${tarif}</span></div>
-            <div class="kf"><div class="ttd"><div><div class="line"></div>Penerima</div><div><div class="line"></div>Penagih</div></div><p style="margin-top:8px;">Cetak: ${new Date().toLocaleDateString('id-ID')}</p></div>
-        </div>
-        <div class="kh pelanggan">
-            <div class="kt">📡 KUPON TAGIHAN WIFI<br><small>(PELANGGAN)</small></div>
-            <div class="kr"><span class="kl">NOMOR HP</span><span class="kv">${p.nomorHP||'-'}</span></div>
-            <div class="kr"><span class="kl">NOMOR KTL</span><span class="kv">${p.nomorKTL||'-'}</span></div>
-            <div class="kr"><span class="kl">NAMA</span><span class="kv">${p.nama||'-'}</span></div>
-            <div class="kr"><span class="kl">ALAMAT</span><span class="kv">${p.alamat||'-'}</span></div>
-            <div class="kr"><span class="kl">BULAN</span><span class="kv">${bulanNama}</span></div>
-            <div class="kr"><span class="kl">TARIFF</span><span class="kv">${tarif}</span></div>
-            <div class="kr"><span class="kl">STATUS</span><span class="kv ${status?'sl':'sb'}">${status?'✅ LUNAS':'❌ BELUM BAYAR'}</span></div>
-            <div class="kr"><span class="kl">TGL BAYAR</span><span class="kv">${bayar?bayar.tglBayar:'-'}</span></div>
-            <div class="kd"></div>
-            <div class="kr"><span class="kl">JUMLAH RP</span><span class="kv" style="font-weight:bold;font-size:13px;">${tarif}</span></div>
-            <div class="kf"><div class="ttd"><div><div class="line"></div>Penerima</div><div><div class="line"></div>Penagih</div></div><p style="margin-top:8px;">Cetak: ${new Date().toLocaleDateString('id-ID')}</p></div>
-        </div>
+    <div class="kupon-container">
+        <div class="kupon-title">📡 KUPON TAGIHAN WIFI<small>PELANGGAN</small></div>
+        <div class="kupon-row"><span class="kupon-label">NOMOR HP</span><span class="kupon-value">${p.nomorHP||'-'}</span></div>
+        <div class="kupon-row"><span class="kupon-label">NOMOR KTL</span><span class="kupon-value">${p.nomorKTL||'-'}</span></div>
+        <div class="kupon-row"><span class="kupon-label">NAMA</span><span class="kupon-value">${p.nama||'-'}</span></div>
+        <div class="kupon-row"><span class="kupon-label">ALAMAT</span><span class="kupon-value">${p.alamat||'-'}</span></div>
+        <div class="kupon-row"><span class="kupon-label">BULAN</span><span class="kupon-value">${bulanNama}</span></div>
+        <div class="kupon-row"><span class="kupon-label">TARIFF</span><span class="kupon-value">${tarif}</span></div>
+        <div class="kupon-row"><span class="kupon-label">STATUS</span><span class="kupon-value ${status?'status-lunas':'status-belum'}">${status?'✅ LUNAS':'❌ BELUM BAYAR'}</span></div>
+        <div class="kupon-row"><span class="kupon-label">TGL BAYAR</span><span class="kupon-value">${bayar?bayar.tglBayar:'-'}</span></div>
+        <div class="kupon-divider"></div>
+        <div class="kupon-total">JUMLAH: ${tarif}</div>
     </div>
-    <div class="np" style="text-align:center;margin-top:20px;"><button onclick="window.print()" style="padding:10px 30px;font-size:16px;cursor:pointer;">🖨️ Print</button> <button onclick="window.close()" style="padding:10px 30px;font-size:16px;cursor:pointer;margin-left:10px;">Tutup</button></div>
+    <div class="btn-group">
+        <button class="btn-share btn-print" onclick="window.print()">🖨️ Print</button>
+        <button class="btn-share btn-wa" onclick="window.open('${waLink}','_blank')">💬 WhatsApp</button>
+        <button class="btn-share btn-email" onclick="window.location.href='${emailLink}'">📧 Email</button>
+        <button class="btn-share btn-close" onclick="window.close()">✕ Tutup</button>
+    </div>
+    <div class="cetak-info">Dicetak: ${tglCetak} | WiFi Manager Pro</div>
     </body></html>`;
 
     const w = window.open('','_blank');
     w.document.write(html);
     w.document.close();
+}
+
+function formatPhoneNumber(phone) {
+    let c = (phone||'').replace(/[\s\-\(\)]/g,'');
+    if(c.startsWith('0')) c = '62'+c.substring(1);
+    if(c.startsWith('+62')) c = '62'+c.substring(3);
+    return c;
 }
 
 // ==================== BACKUP / EXPORT ====================
@@ -875,7 +794,7 @@ function handleImportFile(input) {
     const progressBar = document.getElementById('progressBar');
     const progressText = document.getElementById('progressText');
 
-    statusEl.innerHTML='<p>📖 Membaca file...</p>';
+    statusEl.innerHTML='<p> Membaca file...</p>';
     progressEl.style.display='block'; progressBar.style.width='0%'; progressText.textContent='0%';
 
     const reader = new FileReader();
@@ -949,7 +868,7 @@ function showPage(name) {
     document.querySelectorAll('.nav-link').forEach(l=>l.classList.remove('active'));
     document.getElementById('page-'+name).classList.add('active');
     if(event&&event.target) event.target.classList.add('active');
-    const titles = {'dashboard':'Dashboard','pelanggan':'Data Pelanggan','pembayaran':'Pembayaran','pengeluaran':'Pengeluaran','keuangan':'Laporan Keuangan','riwayat':'Riwayat Transaksi','notifikasi':'Notifikasi WhatsApp','backup':'Backup & Import'};
+    const titles = {'dashboard':'Dashboard','pelanggan':'Data Pelanggan','pembayaran':'Pembayaran','pengeluaran':'Pengeluaran','keuangan':'Laporan Keuangan','riwayat':'Riwayat Transaksi','backup':'Backup & Import'};
     document.getElementById('pageTitle').textContent = titles[name]||'Dashboard';
     document.getElementById('sidebar').classList.remove('open');
     if(name==='backup') setTimeout(updateBackupPageInfo,100);
@@ -990,7 +909,7 @@ function doLogin() {
 
 function doLogout() {
     if(!confirm('Yakin ingin logout?')) return;
-    auth.signOut().then(()=>showToast('Logout berhasil','warning'));
+    auth.signOut().then(()=>showToast('🚪 Logout berhasil','warning'));
 }
 
 function resetPassword() {
